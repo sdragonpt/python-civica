@@ -7,7 +7,7 @@ from PIL import Image, ImageTk
 conn = sqlite3.connect('empresa.db')
 cursor = conn.cursor()
 
-# Criar a tabela inventario e fotos, caso não existam
+# Criar tabelas se não existirem
 cursor.execute('''
     CREATE TABLE IF NOT EXISTS inventario (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -32,6 +32,7 @@ conn.commit()
 lista_fotos = []
 item_id_para_atualizar = None
 
+# Função para adicionar um novo item com fotos
 def adicionar_item():
     numero_artigo = entry_numero_artigo.get()
     nome = entry_nome.get()
@@ -53,14 +54,15 @@ def adicionar_item():
     messagebox.showinfo("Sucesso", "Item adicionado com sucesso!")
     limpar_campos()
     exibir_inventario()
-    janela_adicao.destroy()
 
+# Função para adicionar fotos
 def adicionar_foto():
     caminhos_fotos = filedialog.askopenfilenames(filetypes=[("Imagens", "*.jpg;*.jpeg;*.png")])
     for caminho in caminhos_fotos:
         lista_fotos.append(caminho)
         listbox_fotos.insert(END, caminho)
 
+# Função para limpar os campos da interface
 def limpar_campos():
     entry_numero_artigo.delete(0, END)
     entry_nome.delete(0, END)
@@ -68,6 +70,7 @@ def limpar_campos():
     listbox_fotos.delete(0, END)
     lista_fotos.clear()
 
+# Função para exibir o inventário
 def exibir_inventario():
     for widget in frame_lista.winfo_children():
         widget.destroy()
@@ -90,41 +93,22 @@ def exibir_inventario():
             label = Label(frame_lista, text=valor, font=("Arial", 10), bg="#ffffff", borderwidth=1, relief="solid")
             label.grid(row=row_num + 1, column=col, padx=5, pady=5, sticky="nsew")
 
+        # Criar um frame para as fotos
+        frame_fotos = Frame(frame_lista, bg="#ffffff")
+        frame_fotos.grid(row=row_num + 1, column=4, padx=5, pady=5, sticky="nsew")
+        
         cursor.execute('SELECT caminho FROM fotos WHERE item_id = ?', (item_id,))
         fotos = cursor.fetchall()
-        if fotos:
-            for col, foto in enumerate(fotos):
-                caminho = foto[0]
-                img = Image.open(caminho)
-                img.thumbnail((160, 160))  # Aumentar o tamanho da miniatura
-                img_tk = ImageTk.PhotoImage(img)
-
-                # Função para abrir a imagem em tamanho original
-                def mostrar_imagem_original(caminho):
-                    img_original = Image.open(caminho)
-                    
-                    # Definir o tamanho da janela (largura x altura)
-                    largura_original, altura_original = img_original.size
-                    largura_janela = min(largura_original, 800)  # Ajuste para a largura desejada
-                    altura_janela = min(altura_original, 600)    # Ajuste para a altura desejada
-
-                    janela_imagem = Toplevel(root)
-                    janela_imagem.title("Imagem Original")
-                    janela_imagem.geometry(f"{largura_janela}x{altura_janela}")  # Ajusta o tamanho da janela
-                    
-                    img_original.thumbnail((largura_janela, altura_janela))  # Redimensiona a imagem para se ajustar à janela
-                    img_original_tk = ImageTk.PhotoImage(img_original)
-                    label_imagem = Label(janela_imagem, image=img_original_tk)
-                    label_imagem.image = img_original_tk
-                    label_imagem.pack(fill=BOTH, expand=YES)
-
-                label_foto = Label(frame_lista, image=img_tk, bg="#ffffff", borderwidth=1, relief="solid")
-                label_foto.image = img_tk
-                label_foto.grid(row=row_num + 1, column=4 + col, padx=5, pady=5)
-
-                # Bind para clicar na foto e mostrar em tamanho original
-                label_foto.bind("<Button-1>", lambda e, caminho=caminho: mostrar_imagem_original(caminho))
-
+        for idx, foto in enumerate(fotos):
+            caminho = foto[0]
+            img = Image.open(caminho)
+            img.thumbnail((100, 100))
+            img_tk = ImageTk.PhotoImage(img)
+            label_foto = Label(frame_fotos, image=img_tk, bg="#ffffff", borderwidth=1, relief="solid")
+            label_foto.image = img_tk
+            label_foto.grid(row=idx // 3, column=idx % 3, padx=5, pady=5)
+            # Bind para clicar na foto e mostrar em tamanho original
+            label_foto.bind("<Button-1>", lambda e, caminho=caminho: mostrar_imagem_original(caminho))
 
         botao_editar = Button(frame_lista, text="Editar", command=lambda item_id=item_id: carregar_item_para_edicao(item_id))
         botao_editar.grid(row=row_num + 1, column=5, padx=5, pady=5)
@@ -134,6 +118,7 @@ def exibir_inventario():
 
     frame_lista.update()
 
+# Função para deletar um item do inventário
 def deletar_item(item_id):
     confirmacao = messagebox.askyesno("Confirmar Exclusão", f"Tem certeza que deseja excluir o item ID {item_id}?")
     if confirmacao:
@@ -143,6 +128,7 @@ def deletar_item(item_id):
         messagebox.showinfo("Sucesso", f"Item ID {item_id} deletado com sucesso!")
         exibir_inventario()
 
+# Função para carregar um item para edição
 def carregar_item_para_edicao(item_id):
     cursor.execute('SELECT * FROM inventario WHERE id = ?', (item_id,))
     item = cursor.fetchone()
@@ -157,117 +143,109 @@ def carregar_item_para_edicao(item_id):
 
         cursor.execute('SELECT caminho FROM fotos WHERE item_id = ?', (item_id,))
         fotos = cursor.fetchall()
-        caminhos_fotos = [foto[0] for foto in fotos]
+        lista_fotos = [foto[0] for foto in fotos]
+
+        listbox_fotos.delete(0, END)
+        for foto in lista_fotos:
+            listbox_fotos.insert(END, foto)
 
         global item_id_para_atualizar
         item_id_para_atualizar = item_id
-        criar_janela_adicao(item[1], item[2], item[3], caminhos_fotos)
+        frame_adicao.pack(fill=BOTH, expand=True)
+        frame_inicial.pack_forget()
 
+# Função para atualizar um item do inventário
 def atualizar_item():
-    global item_id_para_atualizar
-    if not item_id_para_atualizar:
-        messagebox.showwarning("Atenção", "Nenhum item selecionado para atualizar.")
-        return
+    if item_id_para_atualizar:
+        numero_artigo = entry_numero_artigo.get()
+        nome = entry_nome.get()
+        quantidade = entry_quantidade.get()
 
-    numero_artigo = entry_numero_artigo.get()
-    nome = entry_nome.get()
-    quantidade = entry_quantidade.get()
-
-    if not validar_quantidade(quantidade):
-        messagebox.showerror("Erro", "Quantidade inválida. Deve ser um número inteiro positivo.")
-        return
-
-    cursor.execute('''
-        UPDATE inventario 
-        SET numero_artigo = ?, nome = ?, quantidade = ?
-        WHERE id = ?
-    ''', (numero_artigo, nome, quantidade, item_id_para_atualizar))
-
-    cursor.execute('DELETE FROM fotos WHERE item_id = ?', (item_id_para_atualizar,))
-    for foto in lista_fotos:
         cursor.execute('''
-            INSERT INTO fotos (item_id, caminho)
-            VALUES (?, ?)
-        ''', (item_id_para_atualizar, foto))
+            UPDATE inventario 
+            SET numero_artigo = ?, nome = ?, quantidade = ?
+            WHERE id = ?
+        ''', (numero_artigo, nome, quantidade, item_id_para_atualizar))
 
-    conn.commit()
-    messagebox.showinfo("Sucesso", "Item atualizado com sucesso!")
-    limpar_campos()
-    exibir_inventario()
-    janela_adicao.destroy()
+        cursor.execute('DELETE FROM fotos WHERE item_id = ?', (item_id_para_atualizar,))
+        for foto in lista_fotos:
+            cursor.execute('''
+                INSERT INTO fotos (item_id, caminho)
+                VALUES (?, ?)
+            ''', (item_id_para_atualizar, foto))
 
-def validar_quantidade(quantidade):
-    try:
-        valor = int(quantidade)
-        return valor > 0
-    except ValueError:
-        return False
+        conn.commit()
+        messagebox.showinfo("Sucesso", f"Item ID {item_id_para_atualizar} atualizado com sucesso!")
+        exibir_inventario()
+        limpar_campos()
+        frame_inicial.pack(fill=BOTH, expand=True)
+        frame_adicao.pack_forget()
+    else:
+        messagebox.showwarning("Atenção", "Nenhum item selecionado para atualizar.")
 
-def adicionar_foto():
-    caminhos_fotos = filedialog.askopenfilenames(filetypes=[("Imagens", "*.jpg;*.jpeg;*.png")])
-    for caminho in caminhos_fotos:
-        lista_fotos.append(caminho)
-        listbox_fotos.insert(END, caminho)
-
-def criar_janela_adicao(numero_artigo="", nome="", quantidade="", caminhos_fotos=[]):
-    global janela_adicao, entry_numero_artigo, entry_nome, entry_quantidade, listbox_fotos, lista_fotos
-
-    janela_adicao = Toplevel(root)
-    janela_adicao.title("Adicionar/Editar Item")
-    janela_adicao.geometry("500x400")
-
-    Label(janela_adicao, text="Número do Artigo", font=("Arial", 12)).grid(row=0, column=0, padx=10, pady=10, sticky=W)
-    entry_numero_artigo = Entry(janela_adicao, font=("Arial", 12))
-    entry_numero_artigo.grid(row=0, column=1, padx=10, pady=10)
-    entry_numero_artigo.insert(END, numero_artigo)
-
-    Label(janela_adicao, text="Nome", font=("Arial", 12)).grid(row=1, column=0, padx=10, pady=10, sticky=W)
-    entry_nome = Entry(janela_adicao, font=("Arial", 12))
-    entry_nome.grid(row=1, column=1, padx=10, pady=10)
-    entry_nome.insert(END, nome)
-
-    Label(janela_adicao, text="Quantidade", font=("Arial", 12)).grid(row=2, column=0, padx=10, pady=10, sticky=W)
-    entry_quantidade = Entry(janela_adicao, font=("Arial", 12))
-    entry_quantidade.grid(row=2, column=1, padx=10, pady=10)
-    entry_quantidade.insert(END, quantidade)
-
-    Label(janela_adicao, text="Fotos", font=("Arial", 12)).grid(row=3, column=0, padx=10, pady=10, sticky=W)
-    listbox_fotos = Listbox(janela_adicao, selectmode=SINGLE, font=("Arial", 12))
-    listbox_fotos.grid(row=3, column=1, padx=10, pady=10)
-
-    for caminho in caminhos_fotos:
-        listbox_fotos.insert(END, caminho)
-        lista_fotos.append(caminho)
-
-    Button(janela_adicao, text="Adicionar Item", command=adicionar_item).grid(row=4, column=1, padx=10, pady=10)
-    Button(janela_adicao, text="Adicionar Foto", command=adicionar_foto).grid(row=4, column=0, padx=10, pady=10)
-    Button(janela_adicao, text="Atualizar", command=atualizar_item).grid(row=4, column=2, padx=10, pady=10)
-
-def truncar_base_dados():
-    confirmacao = messagebox.askyesno(
-        "Confirmar Exclusão",
-        "Você está prestes a truncar a base de dados. Isso removerá todos os itens e fotos. Deseja continuar?"
-    )
+# Função para truncar a base de dados
+def truncar_banco_de_dados():
+    confirmacao = messagebox.askyesno("Confirmar Truncamento", "Tem certeza que deseja excluir todos os dados do banco de dados?")
     if confirmacao:
-        try:
-            cursor.execute('DELETE FROM fotos')
-            cursor.execute('DELETE FROM inventario')
-            conn.commit()
-            messagebox.showinfo("Sucesso", "Base de dados truncada com sucesso!")
-            exibir_inventario()
-        except Exception as e:
-            messagebox.showerror("Erro", f"Erro ao truncar a base de dados: {e}")
+        cursor.execute('DELETE FROM inventario')
+        cursor.execute('DELETE FROM fotos')
+        conn.commit()
+        messagebox.showinfo("Sucesso", "Todos os dados foram excluídos!")
+        exibir_inventario()
 
-# Configuração da janela principal
+# Função para mostrar a imagem original
+def mostrar_imagem_original(caminho):
+    img_original = Image.open(caminho)
+    janela_imagem = Toplevel(root)
+    janela_imagem.title("Imagem Original")
+    img_original_tk = ImageTk.PhotoImage(img_original)
+    label_imagem = Label(janela_imagem, image=img_original_tk)
+    label_imagem.image = img_original_tk
+    label_imagem.pack()
+
+# Criação da interface gráfica
 root = Tk()
-root.title("Gerenciamento de Inventário")
-root.geometry("900x500")
+root.title("Gerenciador de Inventário")
 
-frame_lista = Frame(root)
+# Frame para a tela inicial
+frame_inicial = Frame(root)
+frame_inicial.pack(fill=BOTH, expand=True)
+
+# Frame para a tela de adição/edição
+frame_adicao = Frame(root)
+frame_adicao.pack_forget()
+
+# Widgets para a tela inicial
+botao_adicionar = Button(frame_inicial, text="Adicionar Item", command=lambda: (frame_adicao.pack(fill=BOTH, expand=True), frame_inicial.pack_forget()))
+botao_adicionar.pack(pady=10)
+
+botao_truncar = Button(frame_inicial, text="Truncar Base de Dados", command=truncar_banco_de_dados)
+botao_truncar.pack(pady=10)
+
+frame_lista = Frame(frame_inicial)
 frame_lista.pack(fill=BOTH, expand=True)
-
-Button(root, text="Adicionar Item", command=lambda: criar_janela_adicao()).pack(side=LEFT, padx=10, pady=10)
-Button(root, text="Truncar Base de Dados", command=truncar_base_dados).pack(side=LEFT, padx=10, pady=10)
-
 exibir_inventario()
+
+# Widgets para a tela de adição/edição
+Label(frame_adicao, text="Número do Artigo").grid(row=0, column=0, padx=5, pady=5, sticky="e")
+entry_numero_artigo = Entry(frame_adicao)
+entry_numero_artigo.grid(row=0, column=1, padx=5, pady=5)
+
+Label(frame_adicao, text="Nome").grid(row=1, column=0, padx=5, pady=5, sticky="e")
+entry_nome = Entry(frame_adicao)
+entry_nome.grid(row=1, column=1, padx=5, pady=5)
+
+Label(frame_adicao, text="Quantidade").grid(row=2, column=0, padx=5, pady=5, sticky="e")
+entry_quantidade = Entry(frame_adicao)
+entry_quantidade.grid(row=2, column=1, padx=5, pady=5)
+
+Button(frame_adicao, text="Adicionar Foto", command=adicionar_foto).grid(row=3, column=0, columnspan=2, pady=5)
+
+listbox_fotos = Listbox(frame_adicao, width=50)
+listbox_fotos.grid(row=4, column=0, columnspan=2, padx=5, pady=5)
+
+Button(frame_adicao, text="Salvar", command=lambda: (adicionar_item())).grid(row=5, column=0, padx=5, pady=5)
+Button(frame_adicao, text="Atualizar", command=lambda: (atualizar_item())).grid(row=5, column=1, padx=5, pady=5)
+Button(frame_adicao, text="Cancelar", command=lambda: (frame_inicial.pack(fill=BOTH, expand=True), frame_adicao.pack_forget())).grid(row=5, column=2, padx=5, pady=5)
+
 root.mainloop()
