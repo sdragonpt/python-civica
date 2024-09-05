@@ -219,16 +219,6 @@ def truncar_banco_de_dados():
         messagebox.showinfo("Sucesso", "Todos os dados foram excluídos!")
         exibir_inventario()
 
-# Função para mostrar a imagem original
-def mostrar_imagem_original(caminho):
-    img_original = Image.open(caminho)
-    janela_imagem = Toplevel(root)
-    janela_imagem.title("Imagem Original")
-    img_original_tk = ImageTk.PhotoImage(img_original)
-    label_imagem = Label(janela_imagem, image=img_original_tk)
-    label_imagem.image = img_original_tk
-    label_imagem.pack()
-
 # Função para exportar os dados para Excel
 def exportar_para_excel():
     cursor.execute('''
