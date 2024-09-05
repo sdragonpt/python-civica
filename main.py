@@ -268,6 +268,55 @@ def exportar_para_excel():
         wb.save(caminho_arquivo)
         messagebox.showinfo("Sucesso", "Dados exportados com sucesso!")
 
+# Função para mostrar a imagem original (com redimensionamento dinâmico)
+def mostrar_imagem_original(caminho):
+    # Carregar a imagem original
+    img_original = Image.open(caminho)
+    
+    # Definir um tamanho máximo para a imagem (por exemplo, 800x600)
+    max_width, max_height = 800, 600
+    
+    # Redimensionar a imagem para o tamanho máximo, mantendo a proporção
+    img_original.thumbnail((max_width, max_height))
+    
+    # Criar uma nova janela para exibir a imagem
+    janela_imagem = Toplevel(root)
+    janela_imagem.title("Imagem Redimensionada")
+    
+    # Função para atualizar o tamanho da imagem e janela conforme o redimensionamento
+    def atualizar_imagem(event):
+        # Obter o tamanho atual da janela
+        largura_atual = janela_imagem.winfo_width()
+        altura_atual = janela_imagem.winfo_height()
+        
+        # Redimensionar a imagem mantendo a proporção
+        img_resized = img_original.copy()
+        img_resized.thumbnail((largura_atual, altura_atual))
+        
+        # Atualizar a imagem exibida
+        img_resized_tk = ImageTk.PhotoImage(img_resized)
+        label_imagem.config(image=img_resized_tk)
+        label_imagem.image = img_resized_tk  # Manter referência para evitar garbage collection
+    
+    # Criar o widget de imagem
+    img_tk = ImageTk.PhotoImage(img_original)
+    label_imagem = Label(janela_imagem, image=img_tk)
+    label_imagem.image = img_tk  # Manter referência para evitar garbage collection
+    label_imagem.pack(fill=BOTH, expand=True)
+
+    # Ajustar o tamanho inicial da janela com base no tamanho da imagem
+    janela_imagem.geometry(f"{img_original.width()}x{img_original.height()}")
+
+    # Vincular o evento de redimensionamento da janela à função de atualização da imagem
+    janela_imagem.bind("<Configure>", atualizar_imagem)
+
+    # Centralizar a janela na tela
+    janela_imagem.update_idletasks()
+    x = (root.winfo_screenwidth() // 2) - (img_original.width() // 2)
+    y = (root.winfo_screenheight() // 2) - (img_original.height() // 2)
+    janela_imagem.geometry(f"+{x}+{y}")
+
+
 # Criação da interface gráfica
 root = Tk()
 root.title("Gerenciador de Inventário")
@@ -286,8 +335,31 @@ botao_truncar.pack(pady=10)
 botao_exportar = Button(frame_inicial, text="Exportar para Excel", command=exportar_para_excel)
 botao_exportar.pack(pady=10)
 
-frame_lista = Frame(frame_inicial)
-frame_lista.pack(fill=BOTH, expand=True)
+
+# Criação de um Canvas com Scrollbar para a lista de itens
+canvas = Canvas(frame_inicial)
+canvas.pack(side=LEFT, fill=BOTH, expand=True)
+
+scrollbar = Scrollbar(frame_inicial, orient=VERTICAL, command=canvas.yview)
+scrollbar.pack(side=RIGHT, fill=Y)
+
+canvas.configure(yscrollcommand=scrollbar.set)
+
+# Adicionar o frame_lista ao canvas
+frame_lista = Frame(canvas)
+canvas.create_window((0, 0), window=frame_lista, anchor="nw")
+
+# Configurar a barra de rolagem para ajustar ao conteúdo
+def ajustar_scroll(event=None):
+    canvas.configure(scrollregion=canvas.bbox("all"))
+
+# Associar o redimensionamento ao evento de configuração
+frame_lista.bind("<Configure>", ajustar_scroll)
+
+# Permitir que frame_inicial e canvas se expandam com a janela
+frame_inicial.grid_rowconfigure(0, weight=1)
+frame_inicial.grid_columnconfigure(0, weight=1)
+
 exibir_inventario()
 
 def abrir_janela_adicao():
